@@ -1,45 +1,72 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media.Imaging;
+using Microsoft.Practices.Prism.Commands;
+using Microsoft.Win32;
 using OxyPlot;
 using OxyPlot.Axes;
-using OxyPlot.Series;
+using OxyPlot.Wpf;
+using AreaSeries = OxyPlot.Series.AreaSeries;
+using LineSeries = OxyPlot.Series.LineSeries;
+using TimeSpanAxis = OxyPlot.Axes.TimeSpanAxis;
 
 namespace MultimeterLogger
 {
-    public class CustomAxis : LinearAxis
+    public class MainWindowViewModel : BaseModel
     {
-        private MeasurementUnit _unit;
-        public new MeasurementUnit Unit
+        private readonly AreaSeries _dataSeries;
+
+        private readonly LineSeries _averageSeries, _minSeries, _maxSeries;
+
+        private readonly CustomAxis _yAxis;
+        private readonly List<Measurement> _measurements;
+
+        private double? _minX, _maxX, _minY, _maxY;
+
+        public bool ShowAverage
         {
-            get { return _unit; }
+            get { return _averageSeries.IsVisible; }
             set
             {
-                if (_unit == value) return;
-                _unit = value;
-                base.Unit = Measurement.ConvertUnit(value);
-                OnAxisChanged(new AxisChangedEventArgs(AxisChangeTypes.Reset));
+                _averageSeries.IsVisible = value;
+                OnPropertyChanged();
+                Model.RefreshPlot(false);
             }
         }
 
-        public CustomAxis()
-            : base(AxisPosition.Left, "Value")
-        { }
-
-        public override string FormatValue(double x)
+        public bool ShowMinimum
         {
-            return Measurement.GetFriendlyValue(x, _unit);
+            get { return _minSeries.IsVisible; }
+            set
+            {
+                _minSeries.IsVisible = value;
+                OnPropertyChanged();
+                Model.RefreshPlot(false);
+            }
         }
-    }
 
-    public class MainWindowViewModel : BaseModel
-    {
-        private readonly List<Measurement> _measurements;
+        public bool ShowMaximum
+        {
+            get { return _maxSeries.IsVisible; }
+            set
+            {
+                _maxSeries.IsVisible = value;
+                OnPropertyChanged();
+                Model.RefreshPlot(false);
+            }
+        }
 
         public PlotModel Model { get; private set; }
         public MeasurementDataReceiverModel DataReceiver { get; private set; }
+
+        public ICommand SaveAsCommand { get; private set; }
 
         public MainWindowViewModel()
         {
@@ -48,11 +75,22 @@ namespace MultimeterLogger
             DataReceiver = new MeasurementDataReceiverModel();
 
             Model = new PlotModel();
-            var axis = new CustomAxis();
-            Model.Axes.Add(axis);
-            Model.Axes.Add(new TimeSpanAxis(AxisPosition.Bottom, "Time") { AbsoluteMinimum = 0, Unit = "sec" });
+            _yAxis = new CustomAxis
+            {
+                MajorGridlineStyle = LineStyle.Solid,
+                MinorGridlineStyle = LineStyle.Solid
+            };
+            Model.PlotAreaBackground = OxyColors.White;
+            Model.Axes.Add(_yAxis);
+            Model.Axes.Add(new TimeSpanAxis(AxisPosition.Bottom, "Time")
+            {
+                AbsoluteMinimum = 0,
+                Unit = "min:sec",
+                MajorGridlineStyle = LineStyle.Solid,
+                MinorGridlineStyle = LineStyle.Solid
+            });
 
-            var dataSeries =
+            _dataSeries =
                 new AreaSeries
                     {
                         CanTrackerInterpolatePoints = true,
@@ -60,50 +98,128 @@ namespace MultimeterLogger
                         TrackerFormatString = "{FriendlyValue}\nAt: {Time}"
                     };
 
-            var meanSeries =
+            _averageSeries =
                 new LineSeries
                     {
+                        Color = OxyColors.Orange,
                         TrackerFormatString = "Average: {FriendlyValue}"
                     };
 
-            var startTime = DateTime.Now;
+            _minSeries =
+                new LineSeries
+                    {
+                        Color = OxyColors.Blue,
+                        TrackerFormatString = "Min: {FriendlyValue}"
+                    };
 
-            Model.Series.Add(dataSeries);
-            Model.Series.Add(meanSeries);
+            _maxSeries =
+                new LineSeries
+                    {
+                        Color = OxyColors.Red,
+                        TrackerFormatString = "Max: {FriendlyValue}"
+                    };
 
-            DataReceiver.Received.Subscribe(measurement => AddMeasurement(measurement, dataSeries, meanSeries, axis));
+            Model.Series.Add(_dataSeries);
+            Model.Series.Add(_averageSeries);
+            Model.Series.Add(_minSeries);
+            Model.Series.Add(_maxSeries);
 
-            var random = new Random();
-            var prev = 0.0000001;
-            Observable.Interval(TimeSpan.FromSeconds(1)).ObserveOnDispatcher().Subscribe(
-                l =>
+            DataReceiver.Received.Subscribe(AddMeasurement);
+            
+            //var startTime = DateTime.Now;
+            //var random = new Random();
+            //var prev = 0.0000001;
+            //var units = Enum.GetValues(typeof(MeasurementUnit)).OfType<MeasurementUnit>().Take(1).ToArray();
+            //Observable.Interval(TimeSpan.FromSeconds(0.1)).ObserveOnDispatcher().Subscribe(
+            //    l =>
+            //    {
+            //        var newPoint = new Measurement(startTime, TimeSpan.FromSeconds(l), prev + (random.NextDouble() - 0.5) * 0.1 * prev, units[(l / units.Length) % units.Length]);
+            //        prev = newPoint.Value;
+            //        AddMeasurement(newPoint);
+            //    });
+
+            SaveAsCommand = new DelegateCommand(
+                () =>
                 {
-                    var newPoint = new Measurement(startTime, TimeSpan.FromSeconds(l), prev + (random.NextDouble() - 0.5) * 0.1 * prev, MeasurementUnit.Hertz); prev = newPoint.Value;
-                    AddMeasurement(newPoint, dataSeries, meanSeries, axis);
+                    var sfd = new SaveFileDialog { Filter = "Vector drawing|*.svg|Image file|*.png|CSV File|*.csv" };
+                    if (sfd.ShowDialog() != true) return;
+
+                    switch (sfd.FilterIndex)
+                    {
+                        case 1:
+                            var svg = Model.ToSvg(Model.Width, Model.Height, true);
+                            File.WriteAllText(sfd.FileName, svg);
+                            break;
+
+                        case 2:
+                            var canvas = new Canvas { Width = Model.Width, Height = Model.Height };
+                            Model.Render(new ShapesRenderContext(canvas), Model.Width, Model.Height);
+
+                            canvas.Measure(new Size(Model.Width, Model.Height));
+                            canvas.Arrange(new Rect(0, 0, Model.Width, Model.Height));
+
+                            var rtb = new RenderTargetBitmap((int)Model.Width, (int)Model.Height, 96d, 96d, System.Windows.Media.PixelFormats.Default);
+                            rtb.Render(canvas);
+
+                            var pngEncoder = new PngBitmapEncoder();
+                            pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
+                            using (var fs = File.OpenWrite(sfd.FileName))
+                                pngEncoder.Save(fs);
+                            break;
+
+                        case 3:
+                            File.WriteAllLines(sfd.FileName, _measurements.Select(m => m.AbsoluteTime + "," + m.Value + "," + Measurement.ConvertUnit(m.Unit) + "," + m.FriendlyValue));
+                            break;
+                    }
                 });
         }
 
-        private void AddMeasurement(Measurement measurement, AreaSeries dataSeries, DataPointSeries meanSeries, CustomAxis axis)
+        public void Clear(bool onlyUi)
         {
-            axis.Unit = measurement.Unit;
+            if (!onlyUi)
+                _measurements.Clear();
+
+            _dataSeries.Points.Clear();
+            _dataSeries.Points2.Clear();
+            _minX = null;
+            _maxX = null;
+            _minY = null;
+            _maxY = null;
+        }
+
+        private void AddMeasurement(Measurement measurement)
+        {
+            if (_yAxis.Unit != measurement.Unit)
+            {
+                Clear(true);
+                _yAxis.Unit = measurement.Unit;
+            }
 
             _measurements.Add(measurement);
-            double minX = double.MaxValue, maxX = double.MinValue;
-            _measurements.ForEach(m =>
-            {
-                minX = Math.Min(m.X, minX);
-                maxX = Math.Max(m.X, maxX);
-            });
 
-            dataSeries.Points.Add(measurement);
-            dataSeries.Points2.Clear();
-            dataSeries.Points2.Add(new DataPoint(minX, 0));
-            dataSeries.Points2.Add(new DataPoint(maxX, 0));
+            _dataSeries.Points.Add(measurement);
+            _dataSeries.Points2.Clear();
 
-            var average = _measurements.Average(p => p.Value);
-            meanSeries.Points.Clear();
-            meanSeries.Points.Add(new Measurement(measurement.StartTime, TimeSpan.Zero, average, measurement.Unit));
-            meanSeries.Points.Add(new Measurement(measurement.StartTime, measurement.Time, average, measurement.Unit));
+            if (_minX == null || measurement.X < _minX) _minX = measurement.X;
+            if (_maxX == null || measurement.X > _maxX) _maxX = measurement.X;
+            if (_minY == null || measurement.Y < _minY) _minY = measurement.Y;
+            if (_maxY == null || measurement.Y > _maxY) _maxY = measurement.Y;
+
+            _dataSeries.Points2.Add(new DataPoint(_minX.Value, _minY.Value));
+            _dataSeries.Points2.Add(new DataPoint(_maxX.Value, _minY.Value));
+
+            var average = _dataSeries.Points.Average(p => p.Y);
+            _averageSeries.Points.Clear();
+            _averageSeries.Points.Add(new Measurement(measurement.StartTime, TimeSpanAxis.ToTimeSpan(_minX.Value), average, measurement.Unit));
+            _averageSeries.Points.Add(new Measurement(measurement.StartTime, measurement.Time, average, measurement.Unit));
+
+            _minSeries.Points.Clear();
+            _minSeries.Points.Add(new Measurement(measurement.StartTime, TimeSpanAxis.ToTimeSpan(_minX.Value), _minY.Value, measurement.Unit));
+            _minSeries.Points.Add(new Measurement(measurement.StartTime, measurement.Time, _minY.Value, measurement.Unit));
+
+            _maxSeries.Points.Clear();
+            _maxSeries.Points.Add(new Measurement(measurement.StartTime, TimeSpanAxis.ToTimeSpan(_minX.Value), _maxY.Value, measurement.Unit));
+            _maxSeries.Points.Add(new Measurement(measurement.StartTime, measurement.Time, _maxY.Value, measurement.Unit));
 
             Model.RefreshPlot(true);
         }

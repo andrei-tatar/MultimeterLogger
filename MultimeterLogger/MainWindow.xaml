@@ -19,8 +19,15 @@
                       Margin="5,0" Width="100"
                       ItemsSource="{Binding DataReceiver.AvailablePorts}" 
                       SelectedItem="{Binding DataReceiver.Port}"/>
+            <CheckBox Content="Show Average" VerticalAlignment="Center" IsChecked="{Binding ShowAverage, Mode=TwoWay}"
+                      Margin="5,0"/>
+            <CheckBox Content="Show Minimum" VerticalAlignment="Center" IsChecked="{Binding ShowMinimum, Mode=TwoWay}"
+                      Margin="5,0"/>
+            <CheckBox Content="Show Maximum" VerticalAlignment="Center" IsChecked="{Binding ShowMaximum, Mode=TwoWay}"
+                      Margin="5,0"/>
+            <Button Content="Save As" Command="{Binding SaveAsCommand}"/>
         </StackPanel>
-        
+
         <oxy:Plot Model="{Binding Model}" Grid.Row="1"/>
     </Grid>
 </Window>
