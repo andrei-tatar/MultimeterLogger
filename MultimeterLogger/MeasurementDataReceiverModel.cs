@@ -37,6 +37,9 @@ namespace MultimeterLogger
             _received = new Subject<Measurement>();
 
             var ctx = new ReceiveContext();
+
+            //ProcessReceivedData(ctx);
+
             Observable.FromEvent<SerialDataReceivedEventHandler, SerialDataReceivedEventArgs>(
                 action =>
                 {
@@ -57,7 +60,7 @@ namespace MultimeterLogger
             private static readonly Dictionary<int, double> SegmentToDigit =
                 new Dictionary<int, double>
                     {
-                        {0x00, double.NaN},
+                        {0x00, double.PositiveInfinity},
                         {0x7D, 0},
                         {0x05, 1},
                         {0x5B, 2},
@@ -68,7 +71,7 @@ namespace MultimeterLogger
                         {0x15, 7},
                         {0x7F, 8},
                         {0x3F, 9},
-                        {0x68, double.NaN},
+                        {0x68, double.PositiveInfinity},
                     };
 
             public enum Multiple
@@ -186,7 +189,6 @@ namespace MultimeterLogger
                             if (_startRecordingTime == null) _startRecordingTime = DateTime.Now;
 
                             var value = ctx.GetValue();
-                            if (double.IsNaN(value)) break;
                             if (ctx.Unit == null) return;
 
                             _received.OnNext(new Measurement(_startRecordingTime.Value, DateTime.Now - _startRecordingTime.Value, value, ctx.Unit.Value));

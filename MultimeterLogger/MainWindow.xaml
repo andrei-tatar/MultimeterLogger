@@ -7,25 +7,44 @@
         xmlns:multimeterLogger="clr-namespace:MultimeterLogger" xmlns:system="clr-namespace:System;assembly=mscorlib"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525" d:DataContext="{d:DesignInstance multimeterLogger:MainWindowViewModel}">
+        Title="MainWindow" Height="464.925" Width="741.418" d:DataContext="{d:DesignInstance multimeterLogger:MainWindowViewModel}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Margin="0,10,20,0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <TextBlock Text="Value:" FontSize="30" FontFamily="Courier New"/>
+            <TextBlock Text="{Binding LastMeasurement.FriendlyValue}" TextAlignment="Right"
+                       FontSize="30" FontFamily="Courier New"
+                       FontWeight="Bold" MinWidth="220"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5"
+                    Grid.RowSpan="2">
             <TextBlock Text="Port " HorizontalAlignment="Center"/>
+
             <ComboBox HorizontalAlignment="Center"
-                      Margin="5,0" Width="100"
+                      Margin="5,2" Width="100"
                       ItemsSource="{Binding DataReceiver.AvailablePorts}" 
                       SelectedItem="{Binding DataReceiver.Port}"/>
             <CheckBox Content="Show Average" VerticalAlignment="Center" IsChecked="{Binding ShowAverage, Mode=TwoWay}"
-                      Margin="5,0"/>
+                      Margin="5,2"/>
             <CheckBox Content="Show Minimum" VerticalAlignment="Center" IsChecked="{Binding ShowMinimum, Mode=TwoWay}"
-                      Margin="5,0"/>
+                      Margin="5,2"/>
             <CheckBox Content="Show Maximum" VerticalAlignment="Center" IsChecked="{Binding ShowMaximum, Mode=TwoWay}"
-                      Margin="5,0"/>
-            <Button Content="Save As" Command="{Binding SaveAsCommand}"/>
+                      Margin="5,2"/>
+            <Button Content="Save As" Command="{Binding SaveAsCommand}"
+                    Margin="5,2"/>
+            <Button Content="Clear" Command="{Binding ClearCommand}" CommandParameter="{x:Static system:Boolean.FalseString}"
+                    Margin="5,2"/>
+            <Button Content="Clear View" Command="{Binding ClearCommand}" CommandParameter="{x:Static system:Boolean.TrueString}"
+                    Margin="5,2"/>
         </StackPanel>
 
         <oxy:Plot Model="{Binding Model}" Grid.Row="1"/>

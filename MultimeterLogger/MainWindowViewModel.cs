@@ -29,6 +29,7 @@ namespace MultimeterLogger
         private readonly List<Measurement> _measurements;
 
         private double? _minX, _maxX, _minY, _maxY;
+        private Measurement _lastMeasurement;
 
         public bool ShowAverage
         {
@@ -67,6 +68,16 @@ namespace MultimeterLogger
         public MeasurementDataReceiverModel DataReceiver { get; private set; }
 
         public ICommand SaveAsCommand { get; private set; }
+        public ICommand ClearCommand { get; private set; }
+        public Measurement LastMeasurement
+        {
+            get { return _lastMeasurement; }
+            private set
+            {
+                _lastMeasurement = value;
+                OnPropertyChanged();
+            }
+        }
 
         public MainWindowViewModel()
         {
@@ -125,7 +136,7 @@ namespace MultimeterLogger
             Model.Series.Add(_maxSeries);
 
             DataReceiver.Received.Subscribe(AddMeasurement);
-            
+
             //var startTime = DateTime.Now;
             //var random = new Random();
             //var prev = 0.0000001;
@@ -172,6 +183,8 @@ namespace MultimeterLogger
                             break;
                     }
                 });
+
+            ClearCommand = new DelegateCommand<string>(s => { Clear(bool.Parse(s)); Model.RefreshPlot(true); });
         }
 
         public void Clear(bool onlyUi)
@@ -189,6 +202,10 @@ namespace MultimeterLogger
 
         private void AddMeasurement(Measurement measurement)
         {
+            LastMeasurement = measurement;
+            if (double.IsInfinity(measurement.Value))
+                return;
+
             if (_yAxis.Unit != measurement.Unit)
             {
                 Clear(true);
