@@ -36,6 +36,8 @@ namespace MultimeterLogger
 
         public static string GetFriendlyValue(double value, MeasurementUnit? unit = null)
         {
+            if (double.IsInfinity(value)) return "0L";
+
             var auxValue = value;
             var power = 0;
 
