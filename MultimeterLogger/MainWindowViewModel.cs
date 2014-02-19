@@ -184,7 +184,11 @@ namespace MultimeterLogger
                     }
                 });
 
-            ClearCommand = new DelegateCommand<string>(s => { Clear(bool.Parse(s)); Model.RefreshPlot(true); });
+            ClearCommand = new DelegateCommand<string>(s =>
+            {
+                Clear(bool.Parse(s)); Model.RefreshPlot(true);
+                LastMeasurement = null;
+            });
         }
 
         public void Clear(bool onlyUi)
