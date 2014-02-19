@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reactive.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using Microsoft.Practices.Prism.Commands;
 using Microsoft.Win32;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -135,22 +131,23 @@ namespace MultimeterLogger
             Model.Series.Add(_minSeries);
             Model.Series.Add(_maxSeries);
 
-            DataReceiver.Received.Subscribe(AddMeasurement);
+            DataReceiver.Received += AddMeasurement;
 
             //var startTime = DateTime.Now;
             //var random = new Random();
             //var prev = 0.0000001;
             //var units = Enum.GetValues(typeof(MeasurementUnit)).OfType<MeasurementUnit>().Take(1).ToArray();
-            //Observable.Interval(TimeSpan.FromSeconds(0.1)).ObserveOnDispatcher().Subscribe(
-            //    l =>
-            //    {
-            //        var newPoint = new Measurement(startTime, TimeSpan.FromSeconds(l), prev + (random.NextDouble() - 0.5) * 0.1 * prev, units[(l / units.Length) % units.Length]);
-            //        prev = newPoint.Value;
-            //        AddMeasurement(newPoint);
-            //    });
+            //var l = 0;
+            //Application.Current.MainWindow.Tag = new System.Threading.Timer(state =>
+            //{
+            //    var newPoint = new Measurement(startTime, TimeSpan.FromSeconds(l++), prev + (random.NextDouble() - 0.5) * 0.1 * prev, units[(l / units.Length) % units.Length]);
+            //    prev = newPoint.Value;
+            //    AddMeasurement(newPoint);
 
-            SaveAsCommand = new DelegateCommand(
-                () =>
+            //}, null, TimeSpan.Zero, TimeSpan.FromSeconds(0.5));
+
+            SaveAsCommand = new DelegateCommand<object>(
+                o =>
                 {
                     var sfd = new SaveFileDialog { Filter = "Vector drawing|*.svg|Image file|*.png|CSV File|*.csv" };
                     if (sfd.ShowDialog() != true) return;

@@ -1,17 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO.Ports;
-using System.Linq;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Text;
 using System.Windows;
 
 namespace MultimeterLogger
 {
     public class MeasurementDataReceiverModel : BaseModel, IDisposable
     {
-        private readonly Subject<Measurement> _received;
         private readonly SerialPort _serialPort;
         private string _port;
 
@@ -29,24 +24,18 @@ namespace MultimeterLogger
 
         public IEnumerable<string> AvailablePorts { get { return SerialPort.GetPortNames(); } }
 
-        public IObservable<Measurement> Received { get { return _received; } }
+        public delegate void MeasurementReceived(Measurement measurement);
+
+        public event MeasurementReceived Received;
 
         public MeasurementDataReceiverModel()
         {
             _serialPort = new SerialPort {BaudRate = 2400, DataBits = 8, StopBits = StopBits.One, Parity = Parity.None};
-            _received = new Subject<Measurement>();
 
             var ctx = new ReceiveContext();
 
             //ProcessReceivedData(ctx);
-
-            Observable.FromEvent<SerialDataReceivedEventHandler, SerialDataReceivedEventArgs>(
-                action =>
-                {
-                    SerialDataReceivedEventHandler handler = (sender, args) => action(args);
-                    return handler;
-                }, handler => _serialPort.DataReceived += handler, handler => _serialPort.DataReceived -= handler)
-                      .Subscribe(args => ProcessReceivedData(ctx));
+            _serialPort.DataReceived += (sender, args) => ProcessReceivedData(ctx);
         }
 
         private class ReceiveContext
@@ -191,7 +180,8 @@ namespace MultimeterLogger
                             var value = ctx.GetValue();
                             if (ctx.Unit == null) return;
 
-                            _received.OnNext(new Measurement(_startRecordingTime.Value, DateTime.Now - _startRecordingTime.Value, value, ctx.Unit.Value));
+                            if (Received != null)
+                                Received(new Measurement(_startRecordingTime.Value, DateTime.Now - _startRecordingTime.Value, value, ctx.Unit.Value));
                             break;
                     }
 
